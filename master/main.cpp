@@ -1,14 +1,13 @@
 #include "header.h"
 
-extern char **environ;
+//extern char **environ;
 
 int main()
 {
 	string ip_comm;
 	pid_t pid;
 	int status;
-	bool pipeflag = false;
-	vector<int> pipePos;
+	
 	/*for (char **env = environ; *env != 0; env++)
 	{
     	char *thisEnv = *env;
@@ -24,7 +23,8 @@ int main()
 		//	ip_comm[ip_comm.length()-1] = '\0';
 			
 		vector<string> ip_args;
-		
+		vector<int> pipePos;
+		bool pipeflag = false;
 		istringstream ss(ip_comm);
 		
 		while(!ss.eof())
@@ -143,6 +143,27 @@ void pipedCommand(vector<string> ip_args, vector<int> pipePos)
 	int count = comm_count;
 	while(count)
 	{
+		if((comm_num > 1) && (comm_num%2 != 0))
+		{
+			close(fd2[0]);
+			close(fd2[1]);
+			if((pipe(fd2) < 0))
+			{
+				cout<<"pipe() error...exiting.\n";
+				exit(-1);
+			}
+
+		}
+		else if((comm_num > 1) && (comm_num%2 == 0))
+		{
+			close(fd1[0]);
+			close(fd1[1]);
+			if((pipe(fd1) < 0))
+			{
+				cout<<"pipe() error...exiting.\n";
+				exit(-1);
+			}
+		}
 		if((pid = fork()) < 0)
 		{
 			cout<<"fork() error...exiting.\n";
@@ -171,7 +192,7 @@ void pipedCommand(vector<string> ip_args, vector<int> pipePos)
 			}	
 			else if(comm_num == (comm_count - 1))  // if it is last command
 			{
-				if(comm_count%2 != 0)
+				if(comm_num%2 != 0)
 				{
 					close(fd1[1]);
 					close(fd2[0]);
@@ -184,8 +205,8 @@ void pipedCommand(vector<string> ip_args, vector<int> pipePos)
 							cout<<"dup2() error to stdin";
 							exit(-1);
 						}
+						close(fd1[0]);
 					}
-					close(fd1[0]);
 					execvp(args[comm_num][0], args[comm_num]);
 					cout<<"Command "<<args[comm_num][0]<<" couldn't be executed!\n";
 				}
@@ -202,15 +223,15 @@ void pipedCommand(vector<string> ip_args, vector<int> pipePos)
 							cout<<"dup2() error to stdin";
 							exit(-1);
 						}
+						close(fd2[0]);
 					}
-					close(fd2[0]);
 					execvp(args[comm_num][0], args[comm_num]);
 					cout<<"Command "<<args[comm_num][0]<<" couldn't be executed!\n";
 				}
 			}
 			else
 			{
-				if(comm_count%2 != 0)
+				if(comm_num%2 != 0)
 				{
 					close(fd1[1]);
 					close(fd2[0]);
@@ -222,8 +243,8 @@ void pipedCommand(vector<string> ip_args, vector<int> pipePos)
 							cout<<"dup2() error to stdin";
 							exit(-1);
 						}
+						close(fd1[0]);
 					}
-					close(fd1[0]);
 					close(STDOUT_FILENO);
 					if(fd2[1] != STDOUT_FILENO)
 					{
@@ -232,8 +253,8 @@ void pipedCommand(vector<string> ip_args, vector<int> pipePos)
 							cout<<"dup2() error to stdout";
 							exit(-1);
 						}
+						close(fd2[1]);
 					}
-					close(fd2[1]);
 					execvp(args[comm_num][0], args[comm_num]);
 					cout<<"Command "<<args[comm_num][0]<<" couldn't be executed!\n";
 				}
@@ -249,8 +270,8 @@ void pipedCommand(vector<string> ip_args, vector<int> pipePos)
 							cout<<"dup2() error to stdin";
 							exit(-1);
 						}
+						close(fd2[0]);
 					}
-					close(fd2[0]);
 					close(STDOUT_FILENO);
 					if(fd1[1] != STDOUT_FILENO)
 					{
@@ -259,8 +280,8 @@ void pipedCommand(vector<string> ip_args, vector<int> pipePos)
 							cout<<"dup2() error to stdout";
 							exit(-1);
 						}
+						close(fd1[1]);
 					}
-					close(fd1[1]);
 					execvp(args[comm_num][0], args[comm_num]);
 					cout<<"Command "<<args[comm_num][0]<<" couldn't be executed!\n";
 				}
