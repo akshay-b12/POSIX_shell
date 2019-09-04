@@ -2,6 +2,9 @@
 
 //extern char **environ;
 
+/******Global variables******/
+int fd1[2], fd2[2];
+
 int main()
 {
 	string ip_comm;
@@ -24,7 +27,9 @@ int main()
 			
 		vector<string> ip_args;
 		vector<int> pipePos;
+		vector<int> redirectPos;
 		bool pipeflag = false;
+		bool redirectflag = false;
 		istringstream ss(ip_comm);
 		
 		while(!ss.eof())
@@ -61,13 +66,21 @@ int main()
 				pipeflag = true;
 				pipePos.push_back(ip_args.size()); // Position of pipe w.r.t 0
 			}
+			else if((tmpstr.compare(">") == 0) || (tmpstr.compare("<") == 0) || (tmpstr.compare(">>") == 0))
+			{
+				redirectflag = true;
+				if(pipePos.empty())
+					redirectPos.push_back(ip_args.size());
+				else
+					redirectPos.push_back(ip_args.size() - pipePos[pipePos.size()-1] - 1);
+			}
 			//cout<<tmpstr<<endl;
 			ip_args.push_back(tmpstr); 
 		}
 		
 		if(pipeflag)
 		{
-			pipedCommand(ip_args, pipePos);
+			pipedCommand(ip_args, pipePos, redirectflag, redirectPos);
 		}
 		else
 		{
@@ -83,22 +96,30 @@ int main()
 				//args[i][ip_args[i].size()] = '\0';
 			}
 			args[ip_args.size()] = NULL;
+
 			if((pid = fork()) < 0)
 			{
-				cout<<"fork() error...exiting.\n";
+				cerr<<"fork() error...exiting.\n";
 				exit(-1);
 			}
 			else if(pid == 0)
 			{
-				execvp(args[0], args);
-				cout<<"Command "<<command<<" couldn't be executed!\n";
+				if(redirectflag)
+				{
+					redirection(args, redirectPos);
+				}
+				else
+				{
+					execvp(args[0], args);
+					cerr<<"Command "<<command<<" couldn't be executed!\n";
+				}
 			}
-		
 			if((pid = waitpid(pid, &status, 0) < 0))
 			{
-				cout<<"waitpid() error...exiting.\n";
+				cerr<<"waitpid() error...exiting.\n";
 				exit(-1);
 			}
+		
 			for(int i=0; i<ip_args.size(); ++i)
 			{
 				delete[] args[i];
@@ -110,9 +131,8 @@ int main()
 	return 0;
 }
 
-void pipedCommand(vector<string> ip_args, vector<int> pipePos)
+void pipedCommand(vector<string> ip_args, vector<int> pipePos, bool redirectflag, vector<int> redirectPos)
 {
-	int fd1[2], fd2[2];
 	pid_t pid;
 	int status;
 	int comm_count = pipePos.size() + 1;
@@ -136,7 +156,7 @@ void pipedCommand(vector<string> ip_args, vector<int> pipePos)
 	
 	if((pipe(fd1) < 0) || (pipe(fd2) < 0))
 	{
-		cout<<"pipe() error...exiting.\n";
+		cerr<<"pipe() error...exiting.\n";
 		exit(-1);
 	}
 	int comm_num = 0;
@@ -149,7 +169,7 @@ void pipedCommand(vector<string> ip_args, vector<int> pipePos)
 			close(fd2[1]);
 			if((pipe(fd2) < 0))
 			{
-				cout<<"pipe() error...exiting.\n";
+				cerr<<"pipe() error...exiting.\n";
 				exit(-1);
 			}
 
@@ -160,13 +180,13 @@ void pipedCommand(vector<string> ip_args, vector<int> pipePos)
 			close(fd1[1]);
 			if((pipe(fd1) < 0))
 			{
-				cout<<"pipe() error...exiting.\n";
+				cerr<<"pipe() error...exiting.\n";
 				exit(-1);
 			}
 		}
 		if((pid = fork()) < 0)
 		{
-			cout<<"fork() error...exiting.\n";
+			cerr<<"fork() error...exiting.\n";
 			exit(-1);
 		}
 		
@@ -182,13 +202,13 @@ void pipedCommand(vector<string> ip_args, vector<int> pipePos)
 				{
 					if(dup2(fd1[1], STDOUT_FILENO) != STDOUT_FILENO)
 					{
-						cout<<"dup2() error to stdout";
+						cerr<<"dup2() error to stdout";
 						exit(-1);
 					}
 				}
 				close(fd1[1]);
 				execvp(args[comm_num][0], args[comm_num]);
-				cout<<"Command "<<args[comm_num][0]<<" couldn't be executed!\n";
+				cerr<<"Command "<<args[comm_num][0]<<" couldn't be executed!\n";
 			}	
 			else if(comm_num == (comm_count - 1))  // if it is last command
 			{
@@ -202,13 +222,18 @@ void pipedCommand(vector<string> ip_args, vector<int> pipePos)
 					{
 						if(dup2(fd1[0], STDIN_FILENO) != STDIN_FILENO)
 						{
-							cout<<"dup2() error to stdin";
+							cerr<<"dup2() error to stdin";
 							exit(-1);
 						}
 						close(fd1[0]);
 					}
-					execvp(args[comm_num][0], args[comm_num]);
-					cout<<"Command "<<args[comm_num][0]<<" couldn't be executed!\n";
+					if(redirectflag)
+						redirection(args[comm_num], redirectPos);
+					else
+					{
+						execvp(args[comm_num][0], args[comm_num]);
+						cerr<<"Command "<<args[comm_num][0]<<" couldn't be executed!\n";
+					}
 				}
 				else
 				{
@@ -220,13 +245,18 @@ void pipedCommand(vector<string> ip_args, vector<int> pipePos)
 					{
 						if(dup2(fd2[0], STDIN_FILENO) != STDIN_FILENO)
 						{
-							cout<<"dup2() error to stdin";
+							cerr<<"dup2() error to stdin";
 							exit(-1);
 						}
 						close(fd2[0]);
 					}
-					execvp(args[comm_num][0], args[comm_num]);
-					cout<<"Command "<<args[comm_num][0]<<" couldn't be executed!\n";
+					if(redirectflag)
+						redirection(args[comm_num], redirectPos);
+					else
+					{					
+						execvp(args[comm_num][0], args[comm_num]);
+						cerr<<"Command "<<args[comm_num][0]<<" couldn't be executed!\n";
+					}
 				}
 			}
 			else
@@ -240,7 +270,7 @@ void pipedCommand(vector<string> ip_args, vector<int> pipePos)
 					{
 						if(dup2(fd1[0], STDIN_FILENO) != STDIN_FILENO)
 						{
-							cout<<"dup2() error to stdin";
+							cerr<<"dup2() error to stdin";
 							exit(-1);
 						}
 						close(fd1[0]);
@@ -250,13 +280,13 @@ void pipedCommand(vector<string> ip_args, vector<int> pipePos)
 					{
 						if(dup2(fd2[1], STDOUT_FILENO) != STDOUT_FILENO)
 						{
-							cout<<"dup2() error to stdout";
+							cerr<<"dup2() error to stdout";
 							exit(-1);
 						}
 						close(fd2[1]);
 					}
 					execvp(args[comm_num][0], args[comm_num]);
-					cout<<"Command "<<args[comm_num][0]<<" couldn't be executed!\n";
+					cerr<<"Command "<<args[comm_num][0]<<" couldn't be executed!\n";
 				}
 				else
 				{
@@ -267,7 +297,7 @@ void pipedCommand(vector<string> ip_args, vector<int> pipePos)
 					{
 						if(dup2(fd2[0], STDIN_FILENO) != STDIN_FILENO)
 						{
-							cout<<"dup2() error to stdin";
+							cerr<<"dup2() error to stdin";
 							exit(-1);
 						}
 						close(fd2[0]);
@@ -277,13 +307,13 @@ void pipedCommand(vector<string> ip_args, vector<int> pipePos)
 					{
 						if(dup2(fd1[1], STDOUT_FILENO) != STDOUT_FILENO)
 						{
-							cout<<"dup2() error to stdout";
+							cerr<<"dup2() error to stdout";
 							exit(-1);
 						}
 						close(fd1[1]);
 					}
 					execvp(args[comm_num][0], args[comm_num]);
-					cout<<"Command "<<args[comm_num][0]<<" couldn't be executed!\n";
+					cerr<<"Command "<<args[comm_num][0]<<" couldn't be executed!\n";
 				}
 			}	
 		}
@@ -307,4 +337,78 @@ void pipedCommand(vector<string> ip_args, vector<int> pipePos)
 	}
 	delete[] args;
 
+}
+
+void redirection(char** ip_comm, vector<int> redirectPos)
+{
+	pid_t pid;
+	int k=0;
+	char **args = new char* [redirectPos[0]+1];
+	for(int k=0; k<redirectPos[0]; ++k)
+	{
+		args[k] = new char [strlen(ip_comm[k])];
+		strcpy(args[k], ip_comm[k]);
+	}
+	args[redirectPos[0]] = NULL;
+	//if((pid = fork()) < 0)
+	//{
+	//	cerr<<"fork() error...exiting.\n";
+	//	exit(-1);
+	//} 
+	//else if(pid == 0)
+	//{
+		if(strcmp(ip_comm[redirectPos[0]], ">") == 0)
+		{
+			//cout<<ip_comm[0]<<ip_comm[1]<<ip_comm[2]<<ip_comm[3]<<endl;
+			int fd = open(ip_comm[redirectPos[0]+1], O_CREAT | O_WRONLY, 644);
+			if(fd < 0)
+			{
+				cerr<<"Could not open file. Redirection failed";
+				exit(-1);
+			}
+			if(dup2(fd, STDOUT_FILENO) != STDOUT_FILENO)
+			{
+				cerr<<"dup2() error to stdout";
+				exit(-1);
+			}
+			close(fd);
+			
+			execvp(args[0], args);
+			cerr<<"Command "<<args[0]<<" couldn't be executed!\n";
+		}
+		else if(strcmp(ip_comm[redirectPos[0]], "<") == 0)
+		{
+			int fd = open(ip_comm[redirectPos[0]+1], O_CREAT | O_RDONLY, 644);
+			if(fd < 0)
+			{
+				cerr<<"Could not open file. Redirection failed";
+				exit(-1);
+			}
+			if(dup2(fd, STDIN_FILENO) != STDIN_FILENO)
+			{
+				cerr<<"dup2() error to stdout";
+				exit(-1);
+			}
+			close(fd);
+			execvp(args[0], args);
+			cerr<<"Command "<<args[0]<<" couldn't be executed!\n";
+		}
+		else if(strcmp(ip_comm[redirectPos[0]], ">>") == 0)
+		{
+			int fd = open(ip_comm[redirectPos[0]+1], O_CREAT | O_APPEND, 644);
+			if(fd < 0)
+			{
+				cerr<<"Could not open file. Redirection failed";
+				exit(-1);
+			}
+			if(dup2(fd, STDIN_FILENO) != STDIN_FILENO)
+			{
+				cerr<<"dup2() error to stdout";
+				exit(-1);
+			}
+			close(fd);
+			execvp(args[0], args);
+			cerr<<"Command "<<args[0]<<" couldn't be executed!\n";
+		}
+	//}
 }
