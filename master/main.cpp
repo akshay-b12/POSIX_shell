@@ -205,10 +205,18 @@ void pipedCommand(vector<string> ip_args, vector<int> pipePos, bool redirectflag
 						cerr<<"dup2() error to stdout";
 						exit(-1);
 					}
+					close(fd1[1]);
 				}
-				close(fd1[1]);
-				execvp(args[comm_num][0], args[comm_num]);
-				cerr<<"Command "<<args[comm_num][0]<<" couldn't be executed!\n";
+				if(redirectflag)
+				{
+					redirectflag = false;
+					redirection(args[comm_num], redirectPos);
+				}
+				else
+				{
+					execvp(args[comm_num][0], args[comm_num]);
+					cerr<<"Command "<<args[comm_num][0]<<" couldn't be executed!\n";
+				}
 			}	
 			else if(comm_num == (comm_count - 1))  // if it is last command
 			{
@@ -228,7 +236,10 @@ void pipedCommand(vector<string> ip_args, vector<int> pipePos, bool redirectflag
 						close(fd1[0]);
 					}
 					if(redirectflag)
+					{
+						redirectflag = false;
 						redirection(args[comm_num], redirectPos);
+					}
 					else
 					{
 						execvp(args[comm_num][0], args[comm_num]);
@@ -251,7 +262,10 @@ void pipedCommand(vector<string> ip_args, vector<int> pipePos, bool redirectflag
 						close(fd2[0]);
 					}
 					if(redirectflag)
+					{
+						redirectflag = false;
 						redirection(args[comm_num], redirectPos);
+					}
 					else
 					{					
 						execvp(args[comm_num][0], args[comm_num]);
