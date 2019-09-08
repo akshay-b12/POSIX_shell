@@ -1,0 +1,10 @@
+PATH=/opt/ros/melodic/bin:/home/akshay/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin
+HOME=/home/akshay
+USER=akshay
+PWD=/media/akshay/New Volume/iiit_subjects/sem1/OS/OS_assignments/Assignment_1/OS_assignment_1/master
+PS1=$
+mp4=/usr/bin/vlc
+txt=/usr/bin/gedit
+pdf=/usr/bin/evince
+jpg=/usr/bin/eog
+png=/usr/bin/eog

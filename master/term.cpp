@@ -6,7 +6,7 @@ using namespace std;
 
 main()
 {
-  trieNode **root = NULL;
+  	trieNode **root = NULL;
 	char *path = getenv("PATH");
 	int numOfTrees;
 	//puts(path);
@@ -75,7 +75,7 @@ main()
 
 
   /////////////////////////////////////////////////////////////////////////////////////////////////
-    int fd,c, res;
+    int fd,c;
     struct termios ts, ots;
     FILE *fp;
     

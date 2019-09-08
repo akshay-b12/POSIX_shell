@@ -10,26 +10,77 @@ int main()
 	string ip_comm;
 	pid_t pid;
 	int status;
+	unordered_map<string, string> alias_map;
+	/* Trie variables */
+	trieNode **root = NULL;
+	int numOfTrees;
+	//trie_init(&root);
+
+	/* Termios variables */
+	FILE *fp;
+	struct termios ots;
+	//termios_init(&fp, &ots);
 	
-	/*for (char **env = environ; *env != 0; env++)
-	{
-    	char *thisEnv = *env;
-    	cout<<thisEnv<<endl; 
-	}*/
-	cout<<"% ";
+	/* Environment initialisation */
+	unordered_map<string, string> rc_map;
+	env_init(rc_map);
+
+	cout<<getenv("PS1")<<" ";
 	
-	while(getline(cin, ip_comm))
+	
+	while(getline(cin, ip_comm)) //
 	{
-		//cout<<ip_comm<<endl;
-		//ip_comm.pop_back();
-		//if(ip_comm[ip_comm.length()-1] == '\n')
-		//	ip_comm[ip_comm.length()-1] = '\0';
-			
+		/*
+		char buf[MAX_BUF_LEN];
+        char *ptr;
+        ptr = buf;
+		int c;
+		bool firsttab = false;
+		time_t time1;
+		double seconds;
+		int fd = open("/dev/pts/3", O_CREAT | O_RDONLY, 644);
+		dup2(fd, STDIN_FILENO);
+		close(fd);
+		while ((c = getchar()) != EOF && (c != '\n'))
+		{
+			if((c == 9) && !firsttab)
+			{
+				time(&time1);
+				fseek(fp, -1, SEEK_END);
+				firsttab = true;
+			}
+			else if((c == 9) && firsttab)
+			{
+				time_t time2;
+				time(&time2);
+				fseek(fp, -1, SEEK_END);
+				seconds = difftime(time2,time1);
+				cerr<<seconds;
+				if(seconds < 1.0)
+				{
+					*ptr = 0;
+        			string searchstr(buf);
+        			int comp = printAutoSuggestions(&root, searchstr, numOfTrees);
+					cout<<getenv("PS1")<<" "<<buf;
+				}
+				firsttab = false;
+			}
+			else if (ptr < &buf[MAX_BUF_LEN])
+                *ptr++ = c;
+		}
+        *ptr = 0;
+		putc('\n', fp);
+		ip_comm = buf;
+		*/
 		vector<string> ip_args;
 		vector<int> pipePos;
 		vector<int> redirectPos;
 		bool pipeflag = false;
 		bool redirectflag = false;
+		bool aliasflag = false;
+		bool cdflag = false;
+		bool openflag = false;
+		string alias_str;
 		istringstream ss(ip_comm);
 		
 		while(!ss.eof())
@@ -74,6 +125,27 @@ int main()
 				else
 					redirectPos.push_back(ip_args.size() - pipePos[pipePos.size()-1] - 1);
 			}
+			else if((tmpstr.compare("alias") == 0))
+			{
+				aliasflag = true;
+				char *ptr=&ip_comm[0];
+				while(*ptr != ' ')
+					ptr++;
+				ptr++;
+				alias_str = ptr;
+				alias_str.pop_back();
+				ip_args.push_back(tmpstr);
+				ip_args.push_back(alias_str);
+				break;
+			}
+			else if((tmpstr.compare("cd") == 0))
+			{
+				cdflag = true;
+			}
+			else if((tmpstr.compare("open") == 0))
+			{
+				openflag = true;
+			}
 			//cout<<tmpstr<<endl;
 			ip_args.push_back(tmpstr); 
 		}
@@ -82,21 +154,65 @@ int main()
 		{
 			pipedCommand(ip_args, pipePos, redirectflag, redirectPos);
 		}
+		else if(aliasflag)
+		{
+			alias(alias_map, ip_args);
+			aliasflag=false;
+			continue;
+		}
+		else if(cdflag)
+		{
+			cdflag = false;
+			changedir(ip_args, rc_map);
+		}
+		else if(openflag)
+		{
+			openflag = false;
+			open_comm(ip_args,rc_map);
+		}
 		else
 		{
 			char **args;
-			args = new char* [ip_args.size()+1];
-			char command[ip_args[0].length()+1];
-			ip_args[0].copy(command, ip_args[0].length()+1);
-			command[ip_args[0].length()] = '\0';
-			for(int i=0; i<ip_args.size(); ++i)
+			unordered_map<string, string>::iterator itr = alias_map.find(ip_args[0]);
+			if(itr != alias_map.end())
 			{
-				args[i] = new char [ip_args[i].size()+1];
-				strcpy(args[i],ip_args[i].c_str());
-				//args[i][ip_args[i].size()] = '\0';
+				string tmpstr;
+				vector<string> alias_comm;
+				istringstream alias_ss(itr->second);
+				while(!alias_ss.eof())
+				{
+					alias_ss>>tmpstr;
+					alias_comm.push_back(tmpstr);
+				}
+				args = new char* [alias_comm.size() + (ip_args.size()-1)+1];
+				int j=0;
+				for(int i=0; i<alias_comm.size(); ++i)
+				{
+					args[i] = new char [alias_comm[i].size()+1];
+					strcpy(args[i],alias_comm[i].c_str());
+					j++;
+					//args[i][alias_comm[i].size()] = '\0';
+				}
+				for(int i=1; i<ip_args.size(); ++i)
+				{
+					args[i+j] = new char [ip_args[i].size()+1];
+					strcpy(args[i+j],ip_args[i].c_str());
+					
+					//args[i][ip_args[i].size()] = '\0';
+				}
+				args[alias_comm.size() + (ip_args.size()-1)] = NULL;
 			}
-			args[ip_args.size()] = NULL;
-
+			else
+			{
+				args = new char* [ip_args.size()+1];
+				for(int i=0; i<ip_args.size(); ++i)
+				{
+					args[i] = new char [ip_args[i].size()+1];
+					strcpy(args[i],ip_args[i].c_str());
+					//args[i][ip_args[i].size()] = '\0';
+				}
+				args[ip_args.size()] = NULL;
+			}
 			if((pid = fork()) < 0)
 			{
 				cerr<<"fork() error...exiting.\n";
@@ -111,7 +227,7 @@ int main()
 				else
 				{
 					execvp(args[0], args);
-					cerr<<"Command "<<command<<" couldn't be executed!\n";
+					cerr<<"Command "<<args[0]<<" couldn't be executed!\n";
 				}
 			}
 			if((pid = waitpid(pid, &status, 0) < 0))
@@ -126,8 +242,10 @@ int main()
 			}
 			delete[] args;
 		}
-		cout<<"% ";
+		cout<<getenv("PS1")<<" ";
 	}
+	tcsetattr(fileno(fp), TCSAFLUSH, &ots);
+    fclose(fp);
 	return 0;
 }
 
@@ -333,6 +451,11 @@ void pipedCommand(vector<string> ip_args, vector<int> pipePos, bool redirectflag
 		}
 		comm_num++;
 		count--;
+	}
+	if((pid = waitpid(pid, &status, 0) < 0))
+	{
+		cerr<<"waitpid() error...exiting.\n";
+		exit(-1);
 	}
 	close(fd1[0]);
 	close(fd1[1]);
