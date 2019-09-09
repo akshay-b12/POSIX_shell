@@ -1,10 +1,12 @@
-total 21766
--rwxrwxrwx 1 akshay akshay    59328 Sep  6 23:49 a.out
--rwxrwxrwx 1 akshay akshay      539 Sep  6 18:54 header.h
--rwxrwxrwx 1 akshay akshay 21978192 Sep  5 17:07 header.h.gch
--rwxrwxrwx 1 akshay akshay   194608 Sep  6 23:47 main
--rwxrwxrwx 1 akshay akshay     9115 Sep  6 18:58 main.cpp
--rwxrwxrwx 1 akshay akshay    19600 Sep  6 21:34 term
--rwxrwxrwx 1 akshay akshay     4523 Sep  6 22:30 term.cpp
--rwxrwxrwx 1 akshay akshay       60 Sep  6 01:09 test.txt
--rwxrwxrwx 1 akshay akshay     5425 Sep  6 00:04 trie.cpp
+a.out
+header
+header.h
+header.h.gch
+main
+main.cpp
+myrc.txt
+term
+term.cpp
+test2.txt
+test.txt
+trie.cpp

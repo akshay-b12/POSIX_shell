@@ -25,7 +25,7 @@ int main()
 	unordered_map<string, string> rc_map;
 	env_init(rc_map);
 
-	cout<<getenv("PS1")<<" ";
+	cout<<getenv("USER")<<":"<<getenv("PWD")<<getenv("PS1")<<" ";
 	
 	
 	while(getline(cin, ip_comm)) //
@@ -76,7 +76,7 @@ int main()
 		vector<int> pipePos;
 		vector<int> redirectPos;
 		bool pipeflag = false;
-		bool redirectflag = false;
+		bool redirectflag[3] = {false, false,false};
 		bool aliasflag = false;
 		bool cdflag = false;
 		bool openflag = false;
@@ -119,7 +119,12 @@ int main()
 			}
 			else if((tmpstr.compare(">") == 0) || (tmpstr.compare("<") == 0) || (tmpstr.compare(">>") == 0))
 			{
-				redirectflag = true;
+				if((tmpstr.compare(">") == 0))
+					redirectflag[0] = true;
+				if((tmpstr.compare("<") == 0))
+					redirectflag[1] = true;
+				if((tmpstr.compare(">>") == 0))
+					redirectflag[2] = true;
 				if(pipePos.empty())
 					redirectPos.push_back(ip_args.size());
 				else
@@ -209,7 +214,7 @@ int main()
 				{
 					args[i] = new char [ip_args[i].size()+1];
 					strcpy(args[i],ip_args[i].c_str());
-					//args[i][ip_args[i].size()] = '\0';
+					//lsargs[i][ip_args[i].size()] = '\0';
 				}
 				args[ip_args.size()] = NULL;
 			}
@@ -220,7 +225,7 @@ int main()
 			}
 			else if(pid == 0)
 			{
-				if(redirectflag)
+				if(redirectflag[0] || redirectflag[1] || redirectflag[2])
 				{
 					redirection(args, redirectPos);
 				}
@@ -242,14 +247,14 @@ int main()
 			}
 			delete[] args;
 		}
-		cout<<getenv("PS1")<<" ";
+		cout<<getenv("USER")<<":"<<getenv("PWD")<<getenv("PS1")<<" ";
 	}
 	tcsetattr(fileno(fp), TCSAFLUSH, &ots);
     fclose(fp);
 	return 0;
 }
 
-void pipedCommand(vector<string> ip_args, vector<int> pipePos, bool redirectflag, vector<int> redirectPos)
+void pipedCommand(vector<string> ip_args, vector<int> pipePos, bool *redirectflag, vector<int> &redirectPos)
 {
 	pid_t pid;
 	int status;
@@ -323,11 +328,11 @@ void pipedCommand(vector<string> ip_args, vector<int> pipePos, bool redirectflag
 						cerr<<"dup2() error to stdout";
 						exit(-1);
 					}
-					close(fd1[1]);
+					//close(fd1[1]);
 				}
-				if(redirectflag)
+				if(redirectflag[1])
 				{
-					redirectflag = false;
+					redirectflag[1] = false;
 					redirection(args[comm_num], redirectPos);
 				}
 				else
@@ -351,11 +356,16 @@ void pipedCommand(vector<string> ip_args, vector<int> pipePos, bool redirectflag
 							cerr<<"dup2() error to stdin";
 							exit(-1);
 						}
-						close(fd1[0]);
+						//close(fd1[0]);
 					}
-					if(redirectflag)
+					if(redirectflag[0])
 					{
-						redirectflag = false;
+						redirectflag[0] = false;
+						redirection(args[comm_num], redirectPos);
+					}
+					else if(redirectflag[2])
+					{
+						redirectflag[2] = false;
 						redirection(args[comm_num], redirectPos);
 					}
 					else
@@ -377,11 +387,16 @@ void pipedCommand(vector<string> ip_args, vector<int> pipePos, bool redirectflag
 							cerr<<"dup2() error to stdin";
 							exit(-1);
 						}
-						close(fd2[0]);
+						//close(fd2[0]);
 					}
-					if(redirectflag)
+					if(redirectflag[0])
 					{
-						redirectflag = false;
+						redirectflag[0] = false;
+						redirection(args[comm_num], redirectPos);
+					}
+					else if(redirectflag[2])
+					{
+						redirectflag[2] = false;
 						redirection(args[comm_num], redirectPos);
 					}
 					else
@@ -405,7 +420,7 @@ void pipedCommand(vector<string> ip_args, vector<int> pipePos, bool redirectflag
 							cerr<<"dup2() error to stdin";
 							exit(-1);
 						}
-						close(fd1[0]);
+						//close(fd1[0]);
 					}
 					close(STDOUT_FILENO);
 					if(fd2[1] != STDOUT_FILENO)
@@ -415,7 +430,7 @@ void pipedCommand(vector<string> ip_args, vector<int> pipePos, bool redirectflag
 							cerr<<"dup2() error to stdout";
 							exit(-1);
 						}
-						close(fd2[1]);
+						//close(fd2[1]);
 					}
 					execvp(args[comm_num][0], args[comm_num]);
 					cerr<<"Command "<<args[comm_num][0]<<" couldn't be executed!\n";
@@ -432,7 +447,7 @@ void pipedCommand(vector<string> ip_args, vector<int> pipePos, bool redirectflag
 							cerr<<"dup2() error to stdin";
 							exit(-1);
 						}
-						close(fd2[0]);
+						//close(fd2[0]);
 					}
 					close(STDOUT_FILENO);
 					if(fd1[1] != STDOUT_FILENO)
@@ -442,20 +457,40 @@ void pipedCommand(vector<string> ip_args, vector<int> pipePos, bool redirectflag
 							cerr<<"dup2() error to stdout";
 							exit(-1);
 						}
-						close(fd1[1]);
+						//close(fd1[1]);
 					}
 					execvp(args[comm_num][0], args[comm_num]);
 					cerr<<"Command "<<args[comm_num][0]<<" couldn't be executed!\n";
 				}
 			}	
 		}
+		if(comm_num == 0)
+		{
+			close(fd1[1]);
+		}
+		else if(comm_num == (comm_count - 1))
+		{
+			if(comm_num%2 != 0)
+				close(fd2[1]);
+			else
+				close(fd1[1]);
+
+		}
+		else
+		{
+			if(comm_num%2 != 0)
+				close(fd2[1]);
+			else
+				close(fd1[1]);
+		}
 		comm_num++;
 		count--;
-	}
-	if((pid = waitpid(pid, &status, 0) < 0))
-	{
-		cerr<<"waitpid() error...exiting.\n";
-		exit(-1);
+		
+		if((pid = waitpid(pid, &status, 0) < 0))
+		{
+			cerr<<"waitpid() error...exiting.\n";
+			exit(-1);
+		}
 	}
 	close(fd1[0]);
 	close(fd1[1]);
@@ -476,7 +511,7 @@ void pipedCommand(vector<string> ip_args, vector<int> pipePos, bool redirectflag
 
 }
 
-void redirection(char** ip_comm, vector<int> redirectPos)
+void redirection(char** ip_comm, vector<int> &redirectPos)
 {
 	pid_t pid;
 	int k=0;
@@ -532,13 +567,13 @@ void redirection(char** ip_comm, vector<int> redirectPos)
 		}
 		else if(strcmp(ip_comm[redirectPos[0]], ">>") == 0)
 		{
-			int fd = open(ip_comm[redirectPos[0]+1], O_CREAT | O_APPEND, 644);
+			int fd = open(ip_comm[redirectPos[0]+1], O_CREAT | O_WRONLY | O_APPEND, 644);
 			if(fd < 0)
 			{
 				cerr<<"Could not open file. Redirection failed";
 				exit(-1);
 			}
-			if(dup2(fd, STDIN_FILENO) != STDIN_FILENO)
+			if(dup2(fd, STDOUT_FILENO) != STDOUT_FILENO)
 			{
 				cerr<<"dup2() error to stdout";
 				exit(-1);
@@ -547,5 +582,6 @@ void redirection(char** ip_comm, vector<int> redirectPos)
 			execvp(args[0], args);
 			cerr<<"Command "<<args[0]<<" couldn't be executed!\n";
 		}
+		redirectPos.erase(redirectPos.begin());
 	//}
 }

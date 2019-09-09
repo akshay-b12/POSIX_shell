@@ -29,8 +29,8 @@ using namespace std;
 #define MAX_BUF_LEN 255
 
 /*****Function declaration*****/
-void pipedCommand(vector<string>, vector<int>, bool, vector<int>);
-void redirection(char**, vector<int>);
+void pipedCommand(vector<string>, vector<int>, bool *, vector<int> &);
+void redirection(char**, vector<int> &);
 
 
 
@@ -220,7 +220,7 @@ void termios_init(FILE **fp, struct termios *ots)
 
     tcgetattr(fileno(*fp), &ts);
     *ots = ts;
-    ts.c_lflag &= ICANON | ECHO | ECHOE | VERASE | ECHOCTL;// | VWERASE | VERASE | VEOF;
+    ts.c_lflag &= ~ICANON | ECHO | ECHOE | ECHOCTL;// | VWERASE | VERASE | VEOF;
     tcsetattr(fileno(*fp), TCSAFLUSH, &ts);
 }
 
@@ -267,17 +267,32 @@ void changedir(vector<string> ip_args, unordered_map<string, string> &rc_map)
 	{
 		char *var = new char [ip_args[1].size()+1];
 		strcpy(var, ip_args[1].c_str());
-		chdir(var);
-
-		char cwd[255];
-		getcwd(cwd, 255);
-		string str1("PWD=");
-		str1+=cwd;
-		char *ptr = new char [str1.length()+1];
-		strcpy(ptr, str1.c_str());
-		putenv(ptr);
-		string str2(cwd);
-		rc_map["PWD"] = str2;
+		if((ip_args[1].compare("~") == 0))
+		{
+			//auto itr = rc_map.find("HOME");
+			char *home = getenv("HOME");//new char [itr->second.size()+1];
+			//strcpy(home, itr->second.c_str());
+			string str1("PWD=");
+			str1+=home;
+			char *ptr = new char [str1.length()+1];
+			strcpy(ptr, str1.c_str());
+			putenv(ptr);
+			string str2(home);
+			rc_map["PWD"] = str2;
+		}
+		else
+		{
+			chdir(var);
+			char cwd[255];
+			getcwd(cwd, 255);
+			string str1("PWD=");
+			str1+=cwd;
+			char *ptr = new char [str1.length()+1];
+			strcpy(ptr, str1.c_str());
+			putenv(ptr);
+			string str2(cwd);
+			rc_map["PWD"] = str2;
+		}
 	}
 	else
 		cerr<<"cd command error.\n";
